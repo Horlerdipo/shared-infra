@@ -50,10 +50,12 @@ services:
     restart: unless-stopped
     networks:
       - proxy
+    env_file:
+      - .env
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami.rule=Host(whoami.${DOMAIN_NAME})"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN_NAME}`)"
 
       # Security Middleware 
       - "traefik.http.middlewares.secure-headers.headers.frameDeny=true"
