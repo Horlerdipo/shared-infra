@@ -1,6 +1,19 @@
-# Shared Infrastructure - Traefik Reverse Proxy
+# Shared Infrastructure
 
-This project sets up a Traefik reverse proxy with automatic SSL certificate generation via Let's Encrypt for your server infrastructure.
+A production-ready Docker infrastructure stack with Traefik reverse proxy, automatic SSL certificates, and database services.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Services](#services)
+  - [Traefik (Reverse Proxy)](#traefik-reverse-proxy)
+  - [PostgreSQL (Database)](#postgresql-database)
+- [Environment Variables](#environment-variables)
+- [Useful Commands](#useful-commands)
+- [Troubleshooting](#troubleshooting)
+
+---
 
 ## Prerequisites
 
@@ -8,7 +21,9 @@ This project sets up a Traefik reverse proxy with automatic SSL certificate gene
 - A domain name pointed to your server's IP address
 - Ports 80 and 443 open on your server's firewall
 
-## Setup Instructions
+---
+
+## Quick Start
 
 ### 1. Clone the Repository
 
@@ -19,216 +34,268 @@ cd shared-infra
 
 ### 2. Create Required Directories
 
-Create the `letsencrypt` directory for SSL certificates:
-
 ```bash
 mkdir -p letsencrypt
+chmod 700 letsencrypt
 ```
 
-### 3. Configure Environment Variables
-
-Copy the example environment file and edit it with your values:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in the required values:
-
-```env
-# Database credentials (if using databases)
-MYSQL_DB_USERNAME=your_mysql_username
-MYSQL_DB_PASSWORD=your_mysql_password
-MYSQL_DB_PORT=3306
-
-POSTGRES_DB_USERNAME=your_postgres_username
-POSTGRES_DB_PASSWORD=your_postgres_password
-POSTGRES_DB_PORT=5432
-
-REDIS_DB_USERNAME=your_redis_username
-REDIS_DB_PASSWORD=your_redis_password
-REDIS_DB_PORT=6379
-
-# TLS (Let's Encrypt)
-DOMAIN_NAME=example.com
-TLS_EMAIL_ADDRESS=your-email@example.com
-```
-
-**Important:** 
-- `DOMAIN_NAME` should be without prefix (e.g., `example.com` not `www.example.com` or `https://example.com`)
-- `TLS_EMAIL_ADDRESS` is used for Let's Encrypt certificate notifications
-
-### 4. Create the Proxy Network
-
-Create the Docker network that Traefik uses to communicate with your services:
+### 3. Create the Proxy Network
 
 ```bash
 docker network create proxy
 ```
 
-### 5. Set Proper Permissions
-
-Ensure proper permissions for the letsencrypt directory:
+### 4. Configure Environment Variables
 
 ```bash
-chmod 700 letsencrypt
+cp .env.example .env
 ```
 
-### 6. Secure the Traefik Dashboard (Required for Production)
+Edit `.env` with your values. See [Environment Variables](#environment-variables) for details.
 
-The Traefik dashboard must be secured with authentication in production environments.
+### 5. Secure the Dashboard (Required)
 
-1. Generate a password hash using `htpasswd`:
+Generate a password hash for the Traefik dashboard:
 
 ```bash
-# Install apache2-utils if not already installed
 sudo apt-get install apache2-utils -y
-
-# Generate the password hash (replace YOUR_PASSWORD with a strong password)
 htpasswd -nbB admin YOUR_PASSWORD
 ```
 
-2. Copy the output (it will look like `admin:$2y$05$...`). You'll need to escape any `$` characters by doubling them (e.g., `$` becomes `$$`).
-
-3. Add the following environment variable to your `.env` file:
+Add the output to your `.env` file (escape `$` by doubling them):
 
 ```env
-# Traefik Dashboard Authentication
-DASHBOARD_USER=admin
-DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
+TRAEFIK_DASHBOARD_USER=admin
+TRAEFIK_DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
 ```
 
-4. The `docker-compose.yml` already includes the dashboard authentication middleware. Verify these labels are present:
-
-```yaml
-labels:
-  - "traefik.http.middlewares.dashboard-auth.basicauth.users=${DASHBOARD_USER}:${DASHBOARD_PASSWORD_HASH}"
-```
-
-**Important:** Use a strong, unique password for the dashboard. Consider using a password manager to generate and store it.
-
-### 7. Start Traefik
-
-Launch the Traefik proxy:
+### 6. Start Services
 
 ```bash
 docker compose up -d
 ```
 
-### 8. Verify Installation
-
-Check that Traefik is running:
+### 7. Verify Installation
 
 ```bash
 docker compose ps
 ```
 
-Test the whoami service (replace `example.com` with your domain):
+---
 
+## Services
+
+### Traefik (Reverse Proxy)
+
+Traefik serves as the entry point for all traffic, handling SSL termination and routing requests to appropriate services.
+
+**Features:**
+- Automatic HTTPS redirection
+- Let's Encrypt SSL certificate generation and renewal
+- Secure dashboard with basic authentication
+- Docker provider for automatic service discovery
+
+**Accessing the Dashboard:**
+1. Open `https://traefik.<your-domain>/dashboard` in your browser
+2. Enter the credentials configured in `.env`
+
+**Configuration:**
+- HTTP port: 80
+- HTTPS port: 443
+- Dashboard port: 8080
+- SSL certificates stored in `./letsencrypt/acme.json`
+
+**Start Traefik only:**
 ```bash
-curl -H "Host: whoami.example.com" http://localhost
+docker compose up -d traefik
 ```
 
-## Accessing the Dashboard
-
-The Traefik dashboard is secured with basic authentication. To access it:
-
-1. Open `https://traefik.${DOMAIN_NAME}/dashboard`  in your browser
-2. When prompted, enter the username and password you configured in `.env`
-3. The dashboard shows all routed services, their status, and SSL certificates
-
-**Note:** The dashboard is only accessible over HTTPS with valid credentials.
-
-## Adding New Services
-
-To add a new service to the Traefik proxy:
-
-1. Add the service to `docker-compose.yml` or create a separate compose file
-2. Connect the service to the `proxy` network
-3. Add Traefik labels to configure routing
-
-Example:
-
-```yaml
-services:
-  myapp:
-    image: myapp:latest
-    restart: unless-stopped
-    networks:
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.myapp.rule=Host(`myapp.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.myapp.entrypoints=websecure"
-      - "traefik.http.routers.myapp.tls=true"
-      - "traefik.http.routers.myapp.tls.certresolver=le"
-
-networks:
-  proxy:
-    external: true
-```
-
-## SSL Certificates
-
-Traefik automatically requests and renews SSL certificates from Let's Encrypt for all configured domains. Certificates are stored in `./letsencrypt/acme.json`.
-
-### Certificate Storage
-
-The `acme.json` file contains sensitive certificate data. Ensure:
-
-- The file is included in `.gitignore` (already configured)
-- Proper file permissions are set: `chmod 600 letsencrypt/acme.json`
-
-## Useful Commands
-
-### View Logs
-
+**View Traefik logs:**
 ```bash
 docker compose logs -f traefik
 ```
 
-### Restart Traefik
+---
 
-```bash
-docker compose restart traefik
+### PostgreSQL (Database)
+
+PostgreSQL database service with persistent storage and health checks.
+
+**Features:**
+- Persistent data storage via Docker volume
+- Health checks for container status
+- Configurable version via environment variable
+
+**Default Configuration:**
+- Internal port: 5432
+- External port: Configurable via `POSTGRES_DB_PORT`
+- Volume: `postgres_data`
+
+**Connecting to PostgreSQL:**
+
+From another container on the `proxy` network:
+```
+Host: postgres
+Port: 5432
+User: <POSTGRES_DB_USERNAME>
+Password: <POSTGRES_DB_PASSWORD>
 ```
 
-### Stop All Services
+From external applications:
+```
+Host: <your-server-ip>
+Port: <POSTGRES_DB_PORT>
+User: <POSTGRES_DB_USERNAME>
+Password: <POSTGRES_DB_PASSWORD>
+```
+
+**Start PostgreSQL only:**
+```bash
+docker compose up -d postgres
+```
+
+**View PostgreSQL logs:**
+```bash
+docker compose logs -f postgres
+```
+
+**Access PostgreSQL CLI:**
+```bash
+docker exec -it postgres psql -U <POSTGRES_DB_USERNAME>
+```
+
+**Backup database:**
+```bash
+docker exec postgres pg_dump -U <POSTGRES_DB_USERNAME> <database_name> > backup.sql
+```
+
+**Restore database:**
+```bash
+cat backup.sql | docker exec -i postgres psql -U <POSTGRES_DB_USERNAME> <database_name>
+```
+
+---
+
+## Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```env
+# PostgreSQL
+POSTGRES_VERSION=18
+POSTGRES_DB_USERNAME=your_username
+POSTGRES_DB_PASSWORD=your_secure_password
+POSTGRES_DB_PORT=5432
+POSTGRES_DB_NAME=your_database
+
+# MySQL (optional)
+MYSQL_VERSION=8.0
+MYSQL_DB_USERNAME=your_username
+MYSQL_DB_PASSWORD=your_secure_password
+MYSQL_DB_PORT=3306
+
+# Redis (optional)
+REDIS_VERSION=7
+REDIS_DB_USERNAME=your_username
+REDIS_DB_PASSWORD=your_secure_password
+REDIS_DB_PORT=6379
+
+# TLS (Let's Encrypt)
+DOMAIN_NAME=example.com
+TLS_EMAIL_ADDRESS=your-email@example.com
+
+# Traefik Dashboard Authentication
+TRAEFIK_DASHBOARD_USER=admin
+TRAEFIK_DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
+```
+
+### Required Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DOMAIN_NAME` | Your domain without prefix (e.g., `example.com`) |
+| `TLS_EMAIL_ADDRESS` | Email for Let's Encrypt notifications |
+| `TRAEFIK_DASHBOARD_USER` | Dashboard username |
+| `TRAEFIK_DASHBOARD_PASSWORD_HASH` | Hashed password (use `htpasswd -nbB`) |
+
+### PostgreSQL Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `POSTGRES_VERSION` | PostgreSQL version | `18` |
+| `POSTGRES_DB_USERNAME` | Database username | - |
+| `POSTGRES_DB_PASSWORD` | Database password | - |
+| `POSTGRES_DB_PORT` | External port | `5432` |
+| `POSTGRES_DB_NAME` | Default database name | - |
+
+---
+
+## Useful Commands
+
+### Service Management
 
 ```bash
+# Start all services
+docker compose up -d
+
+# Stop all services
 docker compose down
+
+# Restart a specific service
+docker compose restart <service_name>
+
+# View logs for a service
+docker compose logs -f <service_name>
 ```
 
-### Update Traefik
+### Updates
 
 ```bash
-docker compose pull traefik
-docker compose up -d traefik
+# Pull latest images
+docker compose pull
+
+# Recreate containers with new images
+docker compose up -d
 ```
+
+### Cleanup
+
+```bash
+# Remove stopped containers
+docker compose down
+
+# Remove volumes (WARNING: deletes all data)
+docker compose down -v
+```
+
+---
 
 ## Troubleshooting
 
 ### Certificate Issues
 
-If certificates aren't being generated:
+If SSL certificates aren't being generated:
 
-1. Ensure port 80 is accessible from the internet (required for HTTP-01 challenge)
+1. Ensure port 80 is accessible from the internet
 2. Check logs: `docker compose logs traefik`
-3. Verify your domain DNS points to the correct server IP
-4. Check rate limits at Let's Encrypt (max 5 certificates per domain per week)
+3. Verify DNS points to your server IP
+4. Check Let's Encrypt rate limits (5 certificates per domain per week)
 
 ### Service Not Reachable
 
-If a service isn't accessible:
-
-1. Verify the service is connected to the `proxy` network
+1. Verify the service is on the `proxy` network
 2. Check Traefik labels are correctly formatted
 3. Ensure `traefik.enable=true` is set
 4. Verify the Host rule matches your domain
 
-### Network Issues
+### PostgreSQL Connection Issues
 
-If you see network errors:
+1. Verify PostgreSQL is running: `docker compose ps postgres`
+2. Check health status: `docker inspect postgres | grep -A 10 Health`
+3. Verify credentials in `.env` match connection string
+4. Check if port is exposed correctly
+
+### Network Issues
 
 ```bash
 # Recreate the proxy network
@@ -236,6 +303,8 @@ docker network rm proxy
 docker network create proxy
 docker compose up -d
 ```
+
+---
 
 ## File Structure
 
@@ -246,9 +315,11 @@ shared-infra/
 ├── .env                  # Your environment (gitignored)
 ├── .gitignore            # Git ignore rules
 ├── letsencrypt/          # SSL certificates (gitignored)
-│   └── acme.json         # Let's Encrypt certificate storage
+│   └── acme.json         # Let's Encrypt storage
 └── README.md             # This file
 ```
+
+---
 
 ## License
 

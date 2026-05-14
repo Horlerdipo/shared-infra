@@ -46,6 +46,7 @@ services:
 
   whoami:
     image: "traefik/whoami"
+    container_name: "whoami"
     restart: unless-stopped
     networks:
       - proxy
@@ -70,7 +71,30 @@ services:
       - "traefik.http.routers.whoami.tls=true"
       - "traefik.http.routers.whoami.tls.certresolver=le"
 
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: "postgres"
+    ports:
+      - "${POSTGRES_DB_PORT}:5432"
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_DB_USERNAME}
+    networks: 
+      - proxy
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes: 
+      - postgres_data:/var/lib/postgresql
 
 networks:
   proxy:
     name: proxy
+
+volumes:
+  postgres_data:
