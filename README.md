@@ -320,6 +320,9 @@ REDIS_VERSION=latest
 REDIS_DB_PASSWORD=your_secure_password
 REDIS_DB_PORT=6379
 
+# Traefik
+TRAEFIK_VERSION=latest
+
 # TLS (Let's Encrypt)
 DOMAIN_NAME=example.com
 TLS_EMAIL_ADDRESS=your-email@example.com
@@ -337,6 +340,12 @@ TRAEFIK_DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
 | `TLS_EMAIL_ADDRESS` | Email for Let's Encrypt notifications |
 | `TRAEFIK_DASHBOARD_USER` | Dashboard username |
 | `TRAEFIK_DASHBOARD_PASSWORD_HASH` | Hashed password (use `htpasswd -nbB`) |
+
+### Traefik Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TRAEFIK_VERSION` | Traefik version | `latest` |
 
 ### PostgreSQL Variables
 

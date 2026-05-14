@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.4"
+    image: "traefik:${TRAEFIK_VERSION}"
     container_name: "traefik"
     env_file:
       - .env
