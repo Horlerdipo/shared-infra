@@ -92,9 +92,33 @@ services:
     volumes: 
       - postgres_data:/var/lib/postgresql
 
+  mysql:
+    image: mysql:${MYSQL_VERSION}
+    container_name: mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_USER: ${MYSQL_DB_USERNAME}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_DB_PASSWORD}
+      MYSQL_ALLOW_EMPTY_PASSWORD: false
+    ports:
+      - "${MYSQL_DB_PORT}:3306"
+    healthcheck:
+      test: ["CMD", 'mysqladmin', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: 
+      - proxy
+    volumes:
+      - mysql_data:/var/lib/mysql
+
 networks:
   proxy:
     name: proxy
 
 volumes:
   postgres_data:
+  mysql_data:

@@ -9,6 +9,7 @@ A production-ready Docker infrastructure stack with Traefik reverse proxy, autom
 - [Services](#services)
   - [Traefik (Reverse Proxy)](#traefik-reverse-proxy)
   - [PostgreSQL (Database)](#postgresql-database)
+  - [MySQL (Database)](#mysql-database)
 - [Environment Variables](#environment-variables)
 - [Useful Commands](#useful-commands)
 - [Troubleshooting](#troubleshooting)
@@ -176,6 +177,66 @@ cat backup.sql | docker exec -i postgres psql -U <POSTGRES_DB_USERNAME> <databas
 
 ---
 
+### MySQL (Database)
+
+MySQL database service with persistent storage and health checks.
+
+**Features:**
+- Persistent data storage via Docker volume
+- Health checks for container status
+- Configurable version via environment variable
+- Root user authentication
+
+**Default Configuration:**
+- Internal port: 3306
+- External port: Configurable via `MYSQL_DB_PORT`
+- Volume: `mysql_data`
+
+**Connecting to MySQL:**
+
+From another container on the `proxy` network:
+```
+Host: mysql
+Port: 3306
+User: <MYSQL_DB_USERNAME>
+Password: <MYSQL_DB_PASSWORD>
+```
+
+From external applications:
+```
+Host: <your-server-ip>
+Port: <MYSQL_DB_PORT>
+User: <MYSQL_DB_USERNAME>
+Password: <MYSQL_DB_PASSWORD>
+```
+
+**Start MySQL only:**
+```bash
+docker compose up -d mysql
+```
+
+**View MySQL logs:**
+```bash
+docker compose logs -f mysql
+```
+
+**Access MySQL CLI:**
+```bash
+docker exec -it mysql mysql -u <MYSQL_DB_USERNAME> -p
+```
+
+**Backup database:**
+```bash
+docker exec mysql mysqldump -u <MYSQL_DB_USERNAME> -p<MYSQL_DB_PASSWORD> <database_name> > backup.sql
+```
+
+**Restore database:**
+```bash
+cat backup.sql | docker exec -i mysql mysql -u <MYSQL_DB_USERNAME> -p<MYSQL_DB_PASSWORD> <database_name>
+```
+
+---
+
 ## Environment Variables
 
 Create a `.env` file based on `.env.example`:
@@ -227,6 +288,15 @@ TRAEFIK_DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
 | `POSTGRES_DB_PASSWORD` | Database password | - |
 | `POSTGRES_DB_PORT` | External port | `5432` |
 | `POSTGRES_DB_NAME` | Default database name | - |
+
+### MySQL Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MYSQL_VERSION` | MySQL version | `9.7` |
+| `MYSQL_DB_USERNAME` | Database username | - |
+| `MYSQL_DB_PASSWORD` | Database password | - |
+| `MYSQL_DB_PORT` | External port | `3306` |
 
 ---
 
@@ -294,6 +364,14 @@ If SSL certificates aren't being generated:
 2. Check health status: `docker inspect postgres | grep -A 10 Health`
 3. Verify credentials in `.env` match connection string
 4. Check if port is exposed correctly
+
+### MySQL Connection Issues
+
+1. Verify MySQL is running: `docker compose ps mysql`
+2. Check health status: `docker inspect mysql | grep -A 10 Health`
+3. Verify credentials in `.env` match connection string
+4. Check if port is exposed correctly
+5. For first run, wait for MySQL to initialize (may take 15-30 seconds)
 
 ### Network Issues
 
