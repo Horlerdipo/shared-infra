@@ -115,6 +115,25 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
+  redis:
+    image: redis:${REDIS_VERSION}
+    container_name: redis
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: redis-server --appendonly yes --requirepass "${REDIS_DB_PASSWORD}"
+    ports:
+      - "${REDIS_DB_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_DB_PASSWORD}", "ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: 
+      - proxy
+    volumes: 
+      - redis_data:/data
+
 networks:
   proxy:
     name: proxy
@@ -122,3 +141,4 @@ networks:
 volumes:
   postgres_data:
   mysql_data:
+  redis_data:

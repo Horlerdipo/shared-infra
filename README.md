@@ -1,6 +1,6 @@
 # Shared Infrastructure
 
-A production-ready Docker infrastructure stack with Traefik reverse proxy, automatic SSL certificates, and database services.
+A production-ready Docker infrastructure stack featuring Traefik reverse proxy with automatic SSL certificates via Let's Encrypt, PostgreSQL, MySQL, and Redis services, all orchestrated with Docker Compose.
 
 ## Table of Contents
 
@@ -10,6 +10,7 @@ A production-ready Docker infrastructure stack with Traefik reverse proxy, autom
   - [Traefik (Reverse Proxy)](#traefik-reverse-proxy)
   - [PostgreSQL (Database)](#postgresql-database)
   - [MySQL (Database)](#mysql-database)
+  - [Redis (Cache)](#redis-cache)
 - [Environment Variables](#environment-variables)
 - [Useful Commands](#useful-commands)
 - [Troubleshooting](#troubleshooting)
@@ -237,6 +238,65 @@ cat backup.sql | docker exec -i mysql mysql -u <MYSQL_DB_USERNAME> -p<MYSQL_DB_P
 
 ---
 
+### Redis (Cache)
+
+Redis in-memory data store for caching, session management, and message brokering.
+
+**Features:**
+- Persistent data storage via Docker volume (AOF enabled)
+- Health checks for container status
+- Password authentication
+- Configurable version via environment variable
+
+**Default Configuration:**
+- Internal port: 6379
+- External port: Configurable via `REDIS_DB_PORT`
+- Volume: `redis_data`
+- Persistence: Append-only file (AOF)
+
+**Connecting to Redis:**
+
+From another container on the `proxy` network:
+```
+Host: redis
+Port: 6379
+Password: <REDIS_DB_PASSWORD>
+```
+
+From external applications:
+```
+Host: <your-server-ip>
+Port: <REDIS_DB_PORT>
+Password: <REDIS_DB_PASSWORD>
+```
+
+**Start Redis only:**
+```bash
+docker compose up -d redis
+```
+
+**View Redis logs:**
+```bash
+docker compose logs -f redis
+```
+
+**Access Redis CLI:**
+```bash
+docker exec -it redis redis-cli -a <REDIS_DB_PASSWORD>
+```
+
+**Test connection:**
+```bash
+docker exec -it redis redis-cli -a <REDIS_DB_PASSWORD> ping
+```
+
+**Monitor Redis commands:**
+```bash
+docker exec -it redis redis-cli -a <REDIS_DB_PASSWORD> monitor
+```
+
+---
+
 ## Environment Variables
 
 Create a `.env` file based on `.env.example`:
@@ -255,9 +315,8 @@ MYSQL_DB_USERNAME=your_username
 MYSQL_DB_PASSWORD=your_secure_password
 MYSQL_DB_PORT=3306
 
-# Redis (optional)
-REDIS_VERSION=7
-REDIS_DB_USERNAME=your_username
+# Redis
+REDIS_VERSION=latest
 REDIS_DB_PASSWORD=your_secure_password
 REDIS_DB_PORT=6379
 
@@ -297,6 +356,14 @@ TRAEFIK_DASHBOARD_PASSWORD_HASH=$$2y$$05$$your_hash_here
 | `MYSQL_DB_USERNAME` | Database username | - |
 | `MYSQL_DB_PASSWORD` | Database password | - |
 | `MYSQL_DB_PORT` | External port | `3306` |
+
+### Redis Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_VERSION` | Redis version | `latest` |
+| `REDIS_DB_PASSWORD` | Redis password | - |
+| `REDIS_DB_PORT` | External port | `6379` |
 
 ---
 
@@ -372,6 +439,14 @@ If SSL certificates aren't being generated:
 3. Verify credentials in `.env` match connection string
 4. Check if port is exposed correctly
 5. For first run, wait for MySQL to initialize (may take 15-30 seconds)
+
+### Redis Connection Issues
+
+1. Verify Redis is running: `docker compose ps redis`
+2. Check health status: `docker inspect redis | grep -A 10 Health`
+3. Test connection: `docker exec -it redis redis-cli -a <REDIS_DB_PASSWORD> ping`
+4. Verify password in `.env` matches connection string
+5. Check if port is exposed correctly
 
 ### Network Issues
 
