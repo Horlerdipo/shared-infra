@@ -45,6 +45,23 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=auth"
 
+  portfolio:
+    image: "nginx:alpine"
+    container_name: "portfolio"
+    restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - "../portfolio:/usr/share/nginx/html:ro"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portfolio.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.portfolio.entrypoints=websecure"
+      - "traefik.http.routers.portfolio.tls=true"
+      - "traefik.http.routers.portfolio.tls.certresolver=le"
+      - "traefik.http.routers.portfolio.middlewares=secure-headers"
+      - "traefik.http.services.portfolio.loadbalancer.server.port=80"
+
   whoami:
     image: "traefik/whoami"
     container_name: "whoami"
